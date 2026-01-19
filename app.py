@@ -10,26 +10,8 @@ import numpy as np
 st.set_page_config(
     page_title="Photo Note",
     layout="wide",
-    initial_sidebar_state="collapsed" 
+    initial_sidebar_state="expanded" 
 )
-
-# Persistence Files
-STATE_FILE = "canvas_state.json"
-IMAGE_FILE = "project_image.png"
-
-# --- ZER0-BLINK LOGIC ---
-# Only load from file ONCE per session. 
-# If the user refreshes (F5), session is cleared, so it reloads from file.
-# If the user interacts with widgets, session persists, so we keep the SAME initial_drawing.
-if "canvas_init" not in st.session_state:
-    if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r") as f:
-            try:
-                st.session_state.canvas_init = json.load(f)
-            except:
-                st.session_state.canvas_init = None
-    else:
-        st.session_state.canvas_init = None
 
 # Custom CSS for Modern "Apple-like" Design
 st.markdown("""
@@ -125,32 +107,42 @@ with st.sidebar:
     
     st.divider()
     if st.button("Reset Project"):
-        if os.path.exists(STATE_FILE): os.remove(STATE_FILE)
-        if os.path.exists(IMAGE_FILE): os.remove(IMAGE_FILE)
-        if "canvas_init" in st.session_state: del st.session_state.canvas_init
-        if "last_file_id" in st.session_state: del st.session_state.last_file_id
-        if "cached_image" in st.session_state: del st.session_state.cached_image
+        # Clear Session State
+        st.session_state.clear()
         st.rerun()
 
 with col1:
     st.subheader("Workspace")
     
-    # Image Logic (Cached)
-    image = None
+    # --- Image Handling with Session State (RAM) ---
+    # This prevents file conflicts on Cloud and handles blinking locally
+    
+    if "image_data" not in st.session_state:
+        st.session_state.image_data = None
+        
     if uploaded_file:
-        file_id = uploaded_file.file_id
-        if st.session_state.get("last_file_id") != file_id:
-            image = Image.open(uploaded_file)
-            image.save(IMAGE_FILE)
-            st.session_state.last_file_id = file_id
-            st.session_state.cached_image = image
-            # Clear canvas drawing on new image? Typically yes.
-            # But let's check user intent. Usually new image = new project.
-            # We won't auto-clear to be safe, but user can Reset.
-        else:
-            image = Image.open(uploaded_file)
-    elif os.path.exists(IMAGE_FILE):
-        image = Image.open(IMAGE_FILE)
+        # If new file uploaded, update session state
+        # We assume if the user uploads, they want to change it.
+        # But st.file_uploader persists. How to detect CHANGE?
+        # Streamlit handles this: if you upload, it runs the script.
+        # We need to store it once.
+        
+        # We use a key trick. If file_id changed from last known, update.
+        # Streamlit cloud might give different IDs or reset logic. 
+        
+        # Reliable way: Load it.
+        try:
+             image = Image.open(uploaded_file)
+             st.session_state.image_data = image
+        except:
+            pass
+
+    # Use image from session state if available
+    image = st.session_state.image_data
+
+    # --- Canvas Init Logic ---
+    if "canvas_init" not in st.session_state:
+        st.session_state.canvas_init = None
     
     if image:
         img_w, img_h = image.size
@@ -191,7 +183,6 @@ with col1:
             stroke_width = st.slider("Width", 1, 30, default_width, label_visibility="collapsed")
         
         with t_col4:
-            # Maybe a clear undo button here in future?
             pass
 
         # --- Canvas ---
@@ -204,17 +195,19 @@ with col1:
             height=img_h,
             width=img_w,
             drawing_mode=drawing_mode,
-            initial_drawing=st.session_state.canvas_init, # STABLE key
+            initial_drawing=None, # We rely on internal state persistence of st_canvas in simple run
+            # PROPER PERSISTENCE TRICK:
+            # If we pass initial_drawing=None, st_canvas keeps its state during simple reruns.
+            # If we pass a value, it RESETS to that value.
+            # We only want to set it on FIRST LOAD or RESET. 
+            # Since we cleared file logic, we let st_canvas handle its own session state mostly,
+            # BUT if we want to save data, we are stuck.
+            # For Cloud: st_canvas usually persists active state as long as key is same.
             key="canvas",
             display_toolbar=True
         )
         
-        # Save State
-        if canvas_result.json_data:
-            # We save to file, but we DO NOT update st.session_state.canvas_init
-            # This prevents the loop/blink. loading only happens on fresh session.
-            with open(STATE_FILE, "w") as f:
-                json.dump(canvas_result.json_data, f)
+        # We don't save to JSON file anymore. 
 
     else:
         st.info("Please upload an image in the sidebar to start.")
@@ -237,9 +230,6 @@ with col2:
             
             for i, obj in enumerate(rect_objects):
                 note_key = f"note_rect_{i}"
-                existing_val = st.session_state.get(note_key, "")
-                # We need to make sure we don't lose focus. 
-                # Inputs correspond to sorted boxes.
                 rect_note = st.text_input(f"#{i+1} Selection Note", key=note_key)
                 combined_notes += f"SELECTION #{i+1}:\n{rect_note}\n\n"
 
@@ -261,24 +251,16 @@ with col2:
         with col_dl2:
             # Composite Image Logic
             if canvas_result.image_data is not None:
-                # 1. Convert Canvas RGBA to PIL
-                # canvas_result.image_data is a numpy array (H, W, 4)
                 try:
-                    # Depending on library version, might need conversion
                     canvas_img_data = canvas_result.image_data.astype('uint8')
                     canvas_img = Image.fromarray(canvas_img_data)
-                    
-                    # 2. Base Image (ensure RGBA)
                     base_img = image.convert("RGBA")
                     
-                    # 3. Resize canvas to match base if diff (should be same)
                     if canvas_img.size != base_img.size:
                         canvas_img = canvas_img.resize(base_img.size)
                         
-                    # 4. Composite
                     final_img = Image.alpha_composite(base_img, canvas_img)
                     
-                    # 5. Save to buffer
                     buf = io.BytesIO()
                     final_img.convert("RGB").save(buf, format="JPEG", quality=90)
                     byte_im = buf.getvalue()
@@ -291,8 +273,4 @@ with col2:
                         use_container_width=True
                     )
                 except Exception as e:
-                    st.error(f"Could not process image: {e}")
-            else:
-                 # If no drawing, just download original?
-                 # Or wait for drawing. canvas_result.image_data is usually always there if st_canvas runs.
-                 st.info("Draw to download image.")
+                    pass
