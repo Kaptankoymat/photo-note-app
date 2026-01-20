@@ -149,7 +149,7 @@ with col1:
     # --- Debug: Verify Image Load ---
     if image:
         with st.expander("Debug: Check Image Loading", expanded=False):
-            st.image(image, caption="If you see this, the image is loaded correctly in Python.", use_column_width=True)
+            st.image(image, caption="If you see this, the image is loaded correctly in Python.", use_container_width=True)
             st.write(f"Image Mode: {image.mode}, Size: {image.size}")
 
     # --- Canvas Init Logic ---
@@ -158,6 +158,19 @@ with col1:
     
     if image:
         img_w, img_h = image.size
+        
+        # Prepare image for canvas (Convert to RGB numpy array to avoid PIL issues)
+        # st_canvas handles numpy arrays robustly
+        if image.mode == "RGBA":
+            # Canvas often handles RGB better for background if alpha not needed, 
+            # but let's try keeping it simple. 
+            # If we convert to RGB, we lose transparency but ensure compatibility.
+            # Let's try passing the numpy array of the RGBA first.
+            canvas_bg = np.array(image)
+        else:
+            canvas_bg = np.array(image.convert("RGB"))
+
+        # --- Toolbar ---
         
         # --- Toolbar ---
         t_col1, t_col2, t_col3, t_col4 = st.columns([2, 1, 2, 1])
@@ -209,7 +222,7 @@ with col1:
             fill_color=real_fill_color,
             stroke_width=stroke_width,
             stroke_color=real_stroke_color,
-            background_image=image,
+            background_image=canvas_bg,
             update_streamlit=True,
             height=img_h,
             width=img_w,
