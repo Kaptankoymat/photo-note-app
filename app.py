@@ -146,6 +146,12 @@ with col1:
     # Use image from session state if available
     image = st.session_state.image_data
 
+    # --- Debug: Verify Image Load ---
+    if image:
+        with st.expander("Debug: Check Image Loading", expanded=False):
+            st.image(image, caption="If you see this, the image is loaded correctly in Python.", use_column_width=True)
+            st.write(f"Image Mode: {image.mode}, Size: {image.size}")
+
     # --- Canvas Init Logic ---
     if "canvas_init" not in st.session_state:
         st.session_state.canvas_init = None
@@ -209,7 +215,14 @@ with col1:
             # Since we cleared file logic, we let st_canvas handle its own session state mostly,
             # BUT if we want to save data, we are stuck.
             # For Cloud: st_canvas usually persists active state as long as key is same.
-            key="canvas",
+            # Force re-render if image changes by updating the key
+            canvas_key = "canvas"
+            if "last_uploaded_file" in st.session_state and st.session_state.last_uploaded_file:
+                f = st.session_state.last_uploaded_file
+                # Create a unique key based on filename and size to ensure updates
+                canvas_key = f"canvas_{f.name}_{f.size}"
+                
+            key=canvas_key,
             display_toolbar=True
         )
         
