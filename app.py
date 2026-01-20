@@ -131,11 +131,14 @@ with col1:
         # Streamlit cloud might give different IDs or reset logic. 
         
         # Reliable way: Load it.
-        try:
-             image = Image.open(uploaded_file)
-             st.session_state.image_data = image
-        except:
-            pass
+        # Reliable way: Load it.
+        # Ensure we read from the start of the file
+        uploaded_file.seek(0)
+        image = Image.open(uploaded_file)
+        image = ImageOps.exif_transpose(image)
+        # Force load the image data to ensure it's in memory and not dependent on the file stream
+        image.load()
+        st.session_state.image_data = image
 
     # Use image from session state if available
     image = st.session_state.image_data
