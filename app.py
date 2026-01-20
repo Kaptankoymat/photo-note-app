@@ -63,7 +63,7 @@ st.markdown("""
     
     /* Canvas & Toolbar */
     iframe[title="streamlit_drawable_canvas.st_canvas"] {
-        background-color: white; 
+        /* background-color: white;  Removed to prevent masking logic */
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Subtle shadow for depth */
     }
@@ -167,6 +167,14 @@ with col1:
         else:
             canvas_bg = image
             
+        # Resize if too large to prevent memory/texture issues on Cloud
+        max_width = 1500
+        if canvas_bg.width > max_width:
+             ratio = max_width / canvas_bg.width
+             new_height = int(canvas_bg.height * ratio)
+             canvas_bg = canvas_bg.resize((max_width, new_height))
+             img_w, img_h = canvas_bg.size # Update dims for canvas component
+
         # Ensure we are working with a copy in memory
         canvas_bg = canvas_bg.copy()
 
