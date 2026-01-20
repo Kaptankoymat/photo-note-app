@@ -149,7 +149,7 @@ with col1:
     # --- Debug: Verify Image Load ---
     if image:
         with st.expander("Debug: Check Image Loading", expanded=False):
-            st.image(image, caption="If you see this, the image is loaded correctly in Python.", use_container_width=True)
+            st.image(image, caption="If you see this, the image is loaded correctly in Python.", use_column_width=True)
             st.write(f"Image Mode: {image.mode}, Size: {image.size}")
 
     # --- Canvas Init Logic ---
