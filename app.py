@@ -197,6 +197,13 @@ with col1:
         with t_col4:
             pass
 
+        # Use a dynamic key to force re-render when image changes or updates
+        canvas_key = "canvas"
+        if "last_uploaded_file" in st.session_state and st.session_state.last_uploaded_file:
+            f = st.session_state.last_uploaded_file
+            # Create a unique key based on filename and size to ensure updates
+            canvas_key = f"canvas_{f.name}_{f.size}"
+
         # --- Canvas ---
         canvas_result = st_canvas(
             fill_color=real_fill_color,
@@ -207,7 +214,7 @@ with col1:
             height=img_h,
             width=img_w,
             drawing_mode=drawing_mode,
-            initial_drawing=None, # We rely on internal state persistence of st_canvas in simple run
+            initial_drawing=None, 
             # PROPER PERSISTENCE TRICK:
             # If we pass initial_drawing=None, st_canvas keeps its state during simple reruns.
             # If we pass a value, it RESETS to that value.
@@ -215,13 +222,6 @@ with col1:
             # Since we cleared file logic, we let st_canvas handle its own session state mostly,
             # BUT if we want to save data, we are stuck.
             # For Cloud: st_canvas usually persists active state as long as key is same.
-            # Force re-render if image changes by updating the key
-            canvas_key = "canvas"
-            if "last_uploaded_file" in st.session_state and st.session_state.last_uploaded_file:
-                f = st.session_state.last_uploaded_file
-                # Create a unique key based on filename and size to ensure updates
-                canvas_key = f"canvas_{f.name}_{f.size}"
-                
             key=canvas_key,
             display_toolbar=True
         )
