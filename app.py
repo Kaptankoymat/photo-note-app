@@ -159,16 +159,16 @@ with col1:
     if image:
         img_w, img_h = image.size
         
-        # Prepare image for canvas (Convert to RGB numpy array to avoid PIL issues)
-        # st_canvas handles numpy arrays robustly
-        if image.mode == "RGBA":
-            # Canvas often handles RGB better for background if alpha not needed, 
-            # but let's try keeping it simple. 
-            # If we convert to RGB, we lose transparency but ensure compatibility.
-            # Let's try passing the numpy array of the RGBA first.
-            canvas_bg = np.array(image)
+        # Prepare image for canvas (Revert to PIL Image but sanitized)
+        # st_canvas REQUIRES a PIL image (checks .height), Base64/Numpy crashes it.
+        # We ensure it is strictly RGB and pre-sized to avoid weirdness.
+        if image.mode != "RGB":
+            canvas_bg = image.convert("RGB")
         else:
-            canvas_bg = np.array(image.convert("RGB"))
+            canvas_bg = image
+            
+        # Ensure we are working with a copy in memory
+        canvas_bg = canvas_bg.copy()
 
         # --- Toolbar ---
         
