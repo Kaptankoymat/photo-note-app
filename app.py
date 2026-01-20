@@ -121,24 +121,27 @@ with col1:
         st.session_state.image_data = None
         
     if uploaded_file:
-        # If new file uploaded, update session state
-        # We assume if the user uploads, they want to change it.
-        # But st.file_uploader persists. How to detect CHANGE?
-        # Streamlit handles this: if you upload, it runs the script.
-        # We need to store it once.
+        # Check if this file is different from the one currently loaded
+        # We compare file IDs or names/sizes as a proxy if id not available effectively
+        # Streamlit's UploadedFile has a .file_id attribute usually, or we can use the object itself if it persists
         
-        # We use a key trick. If file_id changed from last known, update.
-        # Streamlit cloud might give different IDs or reset logic. 
+        file_changed = True
+        if "last_uploaded_file" in st.session_state:
+            if st.session_state.last_uploaded_file == uploaded_file:
+                 file_changed = False
         
-        # Reliable way: Load it.
-        # Reliable way: Load it.
-        # Ensure we read from the start of the file
-        uploaded_file.seek(0)
-        image = Image.open(uploaded_file)
-        image = ImageOps.exif_transpose(image)
-        # Force load the image data to ensure it's in memory and not dependent on the file stream
-        image.load()
-        st.session_state.image_data = image
+        if file_changed:
+            uploaded_file.seek(0)
+            try:
+                image = Image.open(uploaded_file)
+                image = ImageOps.exif_transpose(image)
+                # Ensure consistent mode (RGBA covers all bases)
+                image = image.convert("RGBA") 
+                st.session_state.image_data = image
+                st.session_state.last_uploaded_file = uploaded_file
+            except Exception as e:
+                st.error(f"Error loading image: {e}")
+                st.session_state.image_data = None
 
     # Use image from session state if available
     image = st.session_state.image_data
